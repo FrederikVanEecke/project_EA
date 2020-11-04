@@ -1,6 +1,7 @@
 import numpy as np 
 import random 
 import matplotlib.pyplot as plt 
+import Reporter
 
 """
 	Implementations for the different parts of the evolutionary algorithm. 
@@ -12,6 +13,67 @@ import matplotlib.pyplot as plt
 """
 
 ## CLASSES
+# class used for running the problem. 
+class r0123456:
+
+	def __init__(self):
+		self.reporter = Reporter.Reporter(self.__class__.__name__)
+
+
+	# The evolutionary algorithm's main loop
+	def optimize(self, filename):
+		# Read distance matrix from file.		
+		file = open(filename)
+		distanceMatrix = np.loadtxt(file, delimiter=",")
+		file.close()
+		global DM 
+		DM = distanceMatrix #we should probably use distanceMatrix
+		nbrOfVertices = len(DM)
+
+		## variables. 
+		nbrOfPaths = 100
+		offSpringSize = 100
+		k = 10
+		maxIterions =200
+		# initialize 
+		population = initialization(nbrOfPaths, nbrOfVertices)
+
+		# Your code here.
+		i=0
+		while( i < maxIterions ):
+			print(i)
+			# Your code here.
+			offSpring = np.zeros(offSpringSize, dtype=Path)
+			for jj in range(offSpringSize):
+				parent1 = selection_Ktournament(population, k)
+				parent2 = selection_Ktournament(population, k)
+				offSpring[jj] = recombination(parent1, parent2)
+			
+			# mutation only on population, not offspring? 
+			mutation(population, i, maxIterions, mutationProb='lineair', elementsToSwap='lineair')
+
+			population = elimination(population, offSpring)
+			# Call the reporter with:
+			#  - the mean objective function value of the population
+			#  - the best objective function value of the population
+			#  - a 1D numpy array in the cycle notation containing the best solution 
+			#    with city numbering starting from 0
+			meanObjective, bestObjective, bestSolution = evaluateIteration(population)
+			print('Mean objective: {}, best objective: {}'.format(np.round(meanObjective,2), np.round(bestObjective,2) ))
+			timeLeft = self.reporter.report(meanObjective, bestObjective, bestSolution)
+			if timeLeft < 0:
+				break
+			i+=1 
+		for (idx, path) in enumerate(population): 
+			print( 'Path {},length: {}, order: {}'.format(idx,path.length,path.order) )
+
+
+		# Your code here.
+		return 0
+
+
+
+# class representing a possible path
 class Path:
 	""" Represents a possible path. 
 
@@ -28,6 +90,8 @@ class Path:
 		# setting the length depending on the order of the path
 		self.length = objectiveFunction(self.order)
 
+
+	## IMPORTANT: A PATH DIRECTLY UPDATED THE LENGTH IF ITS ORDER IS CHANGED!	
 	def set_order(self, newOrder):
 		self.order = newOrder # setting new order. 
 		self.set_length() # imediately update the length.
@@ -154,7 +218,7 @@ def mutation(population, iteration, MaxIteration, mutationProb='lineair', elemen
 
 ######################################################################################
 ## mutation probability functions
-def linearMutationProb(iteration,maxIterations, prob_i = 0.15, prob_f = 0.05): 
+def linearMutationProb(iteration,maxIterations, prob_i = 0.15, prob_f = 0.5): 
 	# returns a linearly decreasing mutation probability. 
 	# starting at a probability prob_i at iterations 0 and ending at prob_f at maxIterations
 	return (prob_f - prob_i)/(maxIterations)*iteration + prob_i
@@ -166,7 +230,7 @@ def exponentialMutationProb(iteration, maxIterations, prob_i = 0.15, prob_f = 0.
 
 #######################################################################################
 ## functions for swap mutation 
-def linearNumbersToSwap(iteration, maxIterations, initial=5, final=1): 
+def linearNumbersToSwap(iteration, maxIterations, initial=10, final=1): 
 	"""
 		the number of elements to swap drops linearly during the iteration  
 		returns the numbers to swap determing on the iteration 
@@ -227,29 +291,47 @@ def elimination(population, offspring):
 
 	return combined[idx]
 
+## function to evaluate an iterion
+def evaluateIteration(population): 
+	"""
+		returns output for the reporter: 
+		 	#  - the mean objective function value of the population
+			#  - the best objective function value of the population
+			#  - a 1D numpy array in the cycle notation containing the best solution 
+			#    with city numbering starting from 0
+	"""
+
+	# insight: during elimination we sort the population based on the objective function length 
+	# therefore: the best path is the first element of the population. 
+	bestObjective = population[0].length
+	bestCycle = population[0].order
+	meanObjective  = np.mean(np.array([ path.length for path in population ]))
+
+	return meanObjective, bestObjective, bestCycle
+
 
 def main(): 
-	global DM # making it global otherwise it always has to be passed as an argument. 
-	DM, nbrOfVertices = loadData('tour29.csv')
+	# global DM # making it global otherwise it always has to be passed as an argument. 
+	# DM, nbrOfVertices = loadData('tour29.csv')
 	
-	nbrOfPaths = 2
-	k = 3 # k tournament parameter
-	population = initialization(nbrOfPaths, nbrOfVertices)
+	# nbrOfPaths = 2
+	# k = 3 # k tournament parameter
+	# population = initialization(nbrOfPaths, nbrOfVertices)
 
-	# checking population.
-	# for (idx, path) in enumerate(population): 
-	# 	print( 'Path {},length: {}, order: {}'.format(idx,path.length,path.order) )
+	# # checking population.
+	# # for (idx, path) in enumerate(population): 
+	# # 	print( 'Path {},length: {}, order: {}'.format(idx,path.length,path.order) )
 
 
-	# # cheking auto-update of length depending on order.
-	path = Path(np.random.permutation(nbrOfVertices))
-	# print(path.length)
-	# path.set_order(np.random.permutation(nbrOfVertices))
-	# print(path.length)
+	# # # cheking auto-update of length depending on order.
+	# path = Path(np.random.permutation(nbrOfVertices))
+	# # print(path.length)
+	# # path.set_order(np.random.permutation(nbrOfVertices))
+	# # print(path.length)
 
-	## applying k-tournament. 
-	parent1 = selection_Ktournament(population, k)
-	parent2 = selection_Ktournament(population, k)
+	# ## applying k-tournament. 
+	# parent1 = selection_Ktournament(population, k)
+	# parent2 = selection_Ktournament(population, k)
 
 
 	## testing recombination 
@@ -282,12 +364,22 @@ def main():
 	# # work fine
 
 
-	## testing mutation function on a population 
-	for (idx, path) in enumerate(population): 
-		print( 'Path {},length: {}, order: {}'.format(idx,path.length,path.order) )
-	mutation(population, iteration=0, MaxIteration=100, mutationProb='', elementsToSwap='lineair')
-	for (idx, path) in enumerate(population): 
-			print( 'Path {},length: {}, order: {}'.format(idx,path.length,path.order) )
-	
+	# ## testing mutation function on a population 
+	# for (idx, path) in enumerate(population): 
+	# 	print( 'Path {},length: {}, order: {}'.format(idx,path.length,path.order) )
+	# mutation(population, iteration=0, MaxIteration=100, mutationProb='', elementsToSwap='lineair')
+	# for (idx, path) in enumerate(population): 
+	# 		print( 'Path {},length: {}, order: {}'.format(idx,path.length,path.order) )
+
+	# testing final iterator using the r012345 class 
+	 
+	test = r0123456()
+	test.optimize('data/tour929.csv')
+
+	# # BEST SOLUTION ON TOUR29 
+	# # best objective: 27159.84 
+	# # cycle: [ 9  5  0  1  4  7  3  2  6  8 12 13 16 19 15 23 26 24 25 27 28 20 22 21 17 18 14 11 10]
+	# # pars: k=10, mutation prob: 0.15 to 0.5, numbers to swap: 10 to 1, both linear
+
 if __name__ == '__main__':
 	main()
