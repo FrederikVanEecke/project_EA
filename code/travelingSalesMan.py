@@ -124,19 +124,36 @@ def recombination(parent1, parent2):
 
 	return child 
 
-# def mutation(population, iteration, MaxIteration):
-# 	"""
-# 		performs a mutation on all paths in the population
-# 	"""
+def mutation(population, iteration, MaxIteration, mutationProb='lineair', elementsToSwap='lineair'):
+	"""
+		performs a mutation on all paths in the population
+		mutationProb  can be 'lineair' or 'exponential'
+		elementsToSwap  can be 'lineair' or 'exponential'
+		calling the functions linearMutationProb, exponentialMutationProb, linearNumbersToSwap, exponentialNumbersToSwap
+	"""
 
-# 	# calculate mutation probability for this iteration 
-# 	prob = linearMutationProb(iteration, MaxIteration)
+	# calculate mutation probability for this iteration 
+	if mutationProb == 'lineair': 
+		prob = linearMutationProb(iteration, MaxIteration)
+	else: 
+		prob = exponentialMutationProb(iteration, MaxIteration)
 
-# 	for path in population: 
-# 		if prob < np.random.uniform(): 
-# 			# perform mutation
-# 	return prob
+	# get numbers to swap 
+	if elementsToSwap == 'lineair': 
+		nbrToSwap =  linearNumbersToSwap(iteration, MaxIteration)
+	else: 
+		nbrToSwap =  exponentialNumbersToSwap(iteration, MaxIteration)
 
+
+	for path in population: 
+		if prob < np.random.uniform(): 
+			# perform mutation
+			swapMutation(path, nbrToSwap)
+
+	return population
+
+######################################################################################
+## mutation probability functions
 def linearMutationProb(iteration,maxIterations, prob_i = 0.15, prob_f = 0.05): 
 	# returns a linearly decreasing mutation probability. 
 	# starting at a probability prob_i at iterations 0 and ending at prob_f at maxIterations
@@ -147,22 +164,20 @@ def exponentialMutationProb(iteration, maxIterations, prob_i = 0.15, prob_f = 0.
 	# returns an exponentialy decreasing mutation prob.
 	return prob_i*np.exp(1/maxIterations*np.log(prob_f/prob_i)*iteration )
 
+#######################################################################################
+## functions for swap mutation 
 def linearNumbersToSwap(iteration, maxIterations, initial=5, final=1): 
 	"""
 		the number of elements to swap drops linearly during the iteration  
 		returns the numbers to swap determing on the iteration 
 	"""
-	result = (final - initial)/(maxIterations)*iteration + initial
-
-	return result.astype(int)
+	return int( (final - initial)/(maxIterations)*iteration + initial)
 
 def exponentialNumbersToSwap(iteration, maxIterations, initial=5, final=1): 
 	"""
 		the number of elements to swap drops exponentialy during the iteration  
 	"""
-	result = initial*np.exp(1/maxIterations*np.log(final/initial)*iteration)
-
-	return result.astype(int)
+	return int( initial*np.exp(1/maxIterations*np.log(final/initial)*iteration) )
 
 def swapMutation(path:Path, numbersToSwap): 
 	"""
@@ -180,7 +195,7 @@ def swapMutation(path:Path, numbersToSwap):
 	startIDX = random.randint(0,len(path.order)-1-numbersToSwap)
 
 	subarray = path.order[startIDX:startIDX+numbersToSwap]
-	print(subarray)
+
 	remainingVertices = np.setdiff1d(path.order, subarray, True)
 
 	# generate random starting point for subarray in neworder. 
@@ -193,20 +208,37 @@ def swapMutation(path:Path, numbersToSwap):
 		neworder[e] = remainingVertices[i]
 
 	neworder = neworder.astype(int)
+	# set neworder as current order of the path object 
+	# length is updated when calling set_order() 
 	path.set_order(neworder)
 	
-	
+
+
+## Elimination step 
+def elimination(population, offspring): 
+	"""
+		Strategy is to combine the population and offspring and simply return the best paths. 
+	"""
+	# staking them together burher
+	combined = np.hstack((population, offspring))
+
+	# convert to array of lengths and get indices that sort this array  
+	idx = np.argsort(np.array(list( path.length for path in combined )))[0:len(population)]
+
+	return combined[idx]
+
+
 def main(): 
 	global DM # making it global otherwise it always has to be passed as an argument. 
 	DM, nbrOfVertices = loadData('tour29.csv')
 	
-	nbrOfPaths = 10
+	nbrOfPaths = 2
 	k = 3 # k tournament parameter
 	population = initialization(nbrOfPaths, nbrOfVertices)
 
 	# checking population.
-	for (idx, path) in enumerate(population): 
-		print( 'Path {},length: {}, order: {}'.format(idx,path.length,path.order) )
+	# for (idx, path) in enumerate(population): 
+	# 	print( 'Path {},length: {}, order: {}'.format(idx,path.length,path.order) )
 
 
 	# # cheking auto-update of length depending on order.
@@ -219,11 +251,12 @@ def main():
 	parent1 = selection_Ktournament(population, k)
 	parent2 = selection_Ktournament(population, k)
 
-	
-	print(parent1.order)
-	print(parent2.order)	
-	child  = recombination(parent1, parent2)
-	print(child.order)
+
+	## testing recombination 
+	# print(parent1.order)
+	# print(parent2.order)	
+	# child  = recombination(parent1, parent2)
+	# print(child.order)
 	#print('length: {},order: {}'.format(parent.length, parent.order))
 
 	### testing functions 
@@ -231,8 +264,10 @@ def main():
 	# # testing swapMutation 
 	# path = Path(np.random.permutation(6))
 	# print(path.order)
+	# print(path.length)
 	# swapMutation(path,3)
 	# print(path.order)
+	# print(path.length)
 	# # seems to work 
 
 
@@ -240,17 +275,19 @@ def main():
 	# iterations = np.arange(0,101,1)
 	# maxIterations = 100 
 	# # testing mutation probability 
-	# plt.plot(iterations, linearMutationProb(iterations, maxIterations), label='linear')
+	# plt.plot(iterations, linearMutationProb(iterations, maxIterations), label='lineair')
 	# plt.plot(iterations, exponentialMutationProb(iterations, maxIterations), label='exponetial')
 	# plt.legend()
 	# plt.show()
-
-	# # testing numbers to swap 
-	# plt.plot(iterations, linearNumbersToSwap(iterations, maxIterations), label='linear')
-	# plt.plot(iterations, exponentialNumbersToSwap(iterations, maxIterations), label='exponetial')
-	# plt.legend()
-	# plt.show()
 	# # work fine
+
+
+	## testing mutation function on a population 
+	for (idx, path) in enumerate(population): 
+		print( 'Path {},length: {}, order: {}'.format(idx,path.length,path.order) )
+	mutation(population, iteration=0, MaxIteration=100, mutationProb='', elementsToSwap='lineair')
+	for (idx, path) in enumerate(population): 
+			print( 'Path {},length: {}, order: {}'.format(idx,path.length,path.order) )
 	
 if __name__ == '__main__':
 	main()
