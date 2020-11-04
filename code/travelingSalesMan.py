@@ -34,7 +34,7 @@ class r0123456:
 		nbrOfPaths = 100
 		offSpringSize = 100
 		k = 10
-		maxIterions =200
+		maxIterions =10**3
 		# initialize 
 		population = initialization(nbrOfPaths, nbrOfVertices)
 
@@ -64,8 +64,8 @@ class r0123456:
 			if timeLeft < 0:
 				break
 			i+=1 
-		for (idx, path) in enumerate(population): 
-			print( 'Path {},length: {}, order: {}'.format(idx,path.length,path.order) )
+		# for (idx, path) in enumerate(population): 
+		# 	print( 'Path {},length: {}, order: {}'.format(idx,path.length,path.order) )
 
 
 		# Your code here.
@@ -205,8 +205,10 @@ def mutation(population, iteration, MaxIteration, mutationProb='lineair', elemen
 	# get numbers to swap 
 	if elementsToSwap == 'lineair': 
 		nbrToSwap =  linearNumbersToSwap(iteration, MaxIteration)
-	else: 
+	if elementsToSwap == 'exp':
 		nbrToSwap =  exponentialNumbersToSwap(iteration, MaxIteration)
+	if elementsToSwap == 'inv':
+		nbrToSwap =  inverseExponentialNumbersToSwap(iteration, MaxIteration)
 
 
 	for path in population: 
@@ -230,18 +232,23 @@ def exponentialMutationProb(iteration, maxIterations, prob_i = 0.15, prob_f = 0.
 
 #######################################################################################
 ## functions for swap mutation 
-def linearNumbersToSwap(iteration, maxIterations, initial=10, final=1): 
+def linearNumbersToSwap(iteration, maxIterations, initial=40, final=1): 
 	"""
 		the number of elements to swap drops linearly during the iteration  
 		returns the numbers to swap determing on the iteration 
 	"""
 	return int( (final - initial)/(maxIterations)*iteration + initial)
 
-def exponentialNumbersToSwap(iteration, maxIterations, initial=5, final=1): 
+def exponentialNumbersToSwap(iteration, maxIterations, initial=40, final=1): 
 	"""
 		the number of elements to swap drops exponentialy during the iteration  
 	"""
-	return int( initial*np.exp(1/maxIterations*np.log(final/initial)*iteration) )
+	#result = initial*np.exp(1/maxIterations*np.log(final/initial)*iteration)
+	return int(initial*np.exp(1/maxIterations*np.log(final/initial)*iteration))
+
+def inverseExponentialNumbersToSwap(iteration, maxIterations, initial=10, final=1): 
+	result = initial+2 - final*np.exp(1/maxIterations*np.log(initial/final)*iteration)
+	return int(result)
 
 def swapMutation(path:Path, numbersToSwap): 
 	"""
@@ -354,8 +361,8 @@ def main():
 
 
 	# ## testing mutation related functions 
-	# iterations = np.arange(0,101,1)
-	# maxIterations = 100 
+	iterations = np.arange(0,101,1)
+	maxIterations = 100 
 	# # testing mutation probability 
 	# plt.plot(iterations, linearMutationProb(iterations, maxIterations), label='lineair')
 	# plt.plot(iterations, exponentialMutationProb(iterations, maxIterations), label='exponetial')
@@ -363,6 +370,8 @@ def main():
 	# plt.show()
 	# # work fine
 
+	# plt.plot(iterations, inverseExponentialNumbersToSwap(iterations, maxIterations, initial=10, final=1))
+	# plt.show()
 
 	# ## testing mutation function on a population 
 	# for (idx, path) in enumerate(population): 
@@ -374,7 +383,11 @@ def main():
 	# testing final iterator using the r012345 class 
 	 
 	test = r0123456()
-	test.optimize('data/tour929.csv')
+	test.optimize('data/tour194.csv')
+
+	# tour29: simple greedy heuristic 30350.13, optimal value approximately 27500
+	# tour194: simple greedy heuristic 11385.01, optimal value approximately 9000
+	# tour929: simple greedy heuristic 113683.58, optimal value approximately 95300
 
 	# # BEST SOLUTION ON TOUR29 
 	# # best objective: 27159.84 
