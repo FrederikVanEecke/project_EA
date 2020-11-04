@@ -1,5 +1,6 @@
 import numpy as np 
 import random 
+import matplotlib.pyplot as plt 
 
 """
 	Implementations for the different parts of the evolutionary algorithm. 
@@ -122,8 +123,79 @@ def recombination(parent1, parent2):
 	child = Path(order_child)
 
 	return child 
-	
 
+# def mutation(population, iteration, MaxIteration):
+# 	"""
+# 		performs a mutation on all paths in the population
+# 	"""
+
+# 	# calculate mutation probability for this iteration 
+# 	prob = linearMutationProb(iteration, MaxIteration)
+
+# 	for path in population: 
+# 		if prob < np.random.uniform(): 
+# 			# perform mutation
+# 	return prob
+
+def linearMutationProb(iteration,maxIterations, prob_i = 0.15, prob_f = 0.05): 
+	# returns a linearly decreasing mutation probability. 
+	# starting at a probability prob_i at iterations 0 and ending at prob_f at maxIterations
+	return (prob_f - prob_i)/(maxIterations)*iteration + prob_i
+
+
+def exponentialMutationProb(iteration, maxIterations, prob_i = 0.15, prob_f = 0.05): 
+	# returns an exponentialy decreasing mutation prob.
+	return prob_i*np.exp(1/maxIterations*np.log(prob_f/prob_i)*iteration )
+
+def linearNumbersToSwap(iteration, maxIterations, initial=5, final=1): 
+	"""
+		the number of elements to swap drops linearly during the iteration  
+		returns the numbers to swap determing on the iteration 
+	"""
+	result = (final - initial)/(maxIterations)*iteration + initial
+
+	return result.astype(int)
+
+def exponentialNumbersToSwap(iteration, maxIterations, initial=5, final=1): 
+	"""
+		the number of elements to swap drops exponentialy during the iteration  
+	"""
+	result = initial*np.exp(1/maxIterations*np.log(final/initial)*iteration)
+
+	return result.astype(int)
+
+def swapMutation(path:Path, numbersToSwap): 
+	"""
+		relocates a randomly selected subarray from the path.order array whil maintaining the order of elements not in the selected subarray
+		example: [1,2,3,4,5,6]. 
+				 selected subarray: [3,4,5]
+				 result: [1,3,4,5,2,6]
+	"""
+	if numbersToSwap > len(path.order): 
+		raise IndexError()
+
+	neworder = np.zeros(len(path.order))
+	# select subarray of lenght numbersToSwap 
+	# subarray fully determined by a start index, startIDX and its length. 
+	startIDX = random.randint(0,len(path.order)-1-numbersToSwap)
+
+	subarray = path.order[startIDX:startIDX+numbersToSwap]
+	print(subarray)
+	remainingVertices = np.setdiff1d(path.order, subarray, True)
+
+	# generate random starting point for subarray in neworder. 
+	startIDX = random.randint(0,len(path.order)-1-numbersToSwap)
+	remainingIDX = np.setdiff1d(np.arange(0,len(path.order)),np.arange(startIDX,startIDX+numbersToSwap))
+
+	neworder[startIDX:startIDX+numbersToSwap] = subarray
+
+	for (i,e) in enumerate(remainingIDX): 
+		neworder[e] = remainingVertices[i]
+
+	neworder = neworder.astype(int)
+	path.set_order(neworder)
+	
+	
 def main(): 
 	global DM # making it global otherwise it always has to be passed as an argument. 
 	DM, nbrOfVertices = loadData('tour29.csv')
@@ -138,7 +210,7 @@ def main():
 
 
 	# # cheking auto-update of length depending on order.
-	# path = Path(np.random.permutation(nbrOfVertices))
+	path = Path(np.random.permutation(nbrOfVertices))
 	# print(path.length)
 	# path.set_order(np.random.permutation(nbrOfVertices))
 	# print(path.length)
@@ -147,11 +219,38 @@ def main():
 	parent1 = selection_Ktournament(population, k)
 	parent2 = selection_Ktournament(population, k)
 
+	
 	print(parent1.order)
 	print(parent2.order)	
 	child  = recombination(parent1, parent2)
 	print(child.order)
 	#print('length: {},order: {}'.format(parent.length, parent.order))
 
+	### testing functions 
+
+	# # testing swapMutation 
+	# path = Path(np.random.permutation(6))
+	# print(path.order)
+	# swapMutation(path,3)
+	# print(path.order)
+	# # seems to work 
+
+
+	# ## testing mutation related functions 
+	# iterations = np.arange(0,101,1)
+	# maxIterations = 100 
+	# # testing mutation probability 
+	# plt.plot(iterations, linearMutationProb(iterations, maxIterations), label='linear')
+	# plt.plot(iterations, exponentialMutationProb(iterations, maxIterations), label='exponetial')
+	# plt.legend()
+	# plt.show()
+
+	# # testing numbers to swap 
+	# plt.plot(iterations, linearNumbersToSwap(iterations, maxIterations), label='linear')
+	# plt.plot(iterations, exponentialNumbersToSwap(iterations, maxIterations), label='exponetial')
+	# plt.legend()
+	# plt.show()
+	# # work fine
+	
 if __name__ == '__main__':
 	main()
