@@ -34,12 +34,16 @@ class r0123456:
 		nbrOfPaths = 100
 		offSpringSize = 100
 		k = 10
-		maxIterions =10**3
+		maxIterions = 1000
+		explorationScores = np.zeros(maxIterions)
+		explorationBeforeMutation =  np.zeros(maxIterions)
+		mutationProb = np.zeros(maxIterions)
 		# initialize 
 		population = initialization(nbrOfPaths, nbrOfVertices)
 
 		# Your code here.
 		i=0
+		expScore = 1
 		while( i < maxIterions ):
 			print(i)
 			# Your code here.
@@ -50,8 +54,9 @@ class r0123456:
 				offSpring[jj] = recombination(parent1, parent2)
 			
 			# mutation only on population, not offspring? 
-			mutation(population, i, maxIterions, mutationProb='lineair', elementsToSwap='lineair')
-
+			prob = mutation(population, i, maxIterions, mutationProb='lineair', elementsToSwap='inv', explorationScore = expScore)
+			mutationProb[i] = prob
+			explorationBeforeMutation[i] = explorationScore(population)
 			population = elimination(population, offSpring)
 			# Call the reporter with:
 			#  - the mean objective function value of the population
@@ -59,6 +64,8 @@ class r0123456:
 			#  - a 1D numpy array in the cycle notation containing the best solution 
 			#    with city numbering starting from 0
 			meanObjective, bestObjective, bestSolution = evaluateIteration(population)
+			expScore = explorationScore(population)
+			explorationScores[i] = expScore
 			print('Mean objective: {}, best objective: {}'.format(np.round(meanObjective,2), np.round(bestObjective,2) ))
 			timeLeft = self.reporter.report(meanObjective, bestObjective, bestSolution)
 			if timeLeft < 0:
@@ -67,7 +74,11 @@ class r0123456:
 		# for (idx, path) in enumerate(population): 
 		# 	print( 'Path {},length: {}, order: {}'.format(idx,path.length,path.order) )
 
-
+		plt.plot(np.arange(0,maxIterions), explorationScores, label = 'exploration')
+		plt.plot(np.arange(0,maxIterions), explorationBeforeMutation, label = 'exploration before mutation')
+		plt.plot(np.arange(0,maxIterions), mutationProb, label = 'mutation probability')
+		plt.legend()
+		plt.show()
 		# Your code here.
 		return 0
 
@@ -188,7 +199,7 @@ def recombination(parent1, parent2):
 
 	return child 
 
-def mutation(population, iteration, MaxIteration, mutationProb='lineair', elementsToSwap='lineair'):
+def mutation(population, iteration, MaxIteration, mutationProb='lineair', elementsToSwap='lineair', explorationScore=1):
 	"""
 		performs a mutation on all paths in the population
 		mutationProb  can be 'lineair' or 'exponential'
@@ -199,8 +210,13 @@ def mutation(population, iteration, MaxIteration, mutationProb='lineair', elemen
 	# calculate mutation probability for this iteration 
 	if mutationProb == 'lineair': 
 		prob = linearMutationProb(iteration, MaxIteration)
-	else: 
+	if mutationProb == 'exp': 
 		prob = exponentialMutationProb(iteration, MaxIteration)
+	if mutationProb == 'expBased':
+		baseProb = 0.1
+		maxProb = 0.9
+		prob = explorationScoreBasedMutationProb(iteration, MaxIteration, explorationScore, baseProb, maxProb)
+
 
 	# get numbers to swap 
 	if elementsToSwap == 'lineair': 
@@ -216,11 +232,11 @@ def mutation(population, iteration, MaxIteration, mutationProb='lineair', elemen
 			# perform mutation
 			swapMutation(path, nbrToSwap)
 
-	return population
+	return prob
 
 ######################################################################################
 ## mutation probability functions
-def linearMutationProb(iteration,maxIterations, prob_i = 0.15, prob_f = 0.5): 
+def linearMutationProb(iteration,maxIterations, prob_i = 0.5, prob_f = 0.15): 
 	# returns a linearly decreasing mutation probability. 
 	# starting at a probability prob_i at iterations 0 and ending at prob_f at maxIterations
 	return (prob_f - prob_i)/(maxIterations)*iteration + prob_i
@@ -230,16 +246,30 @@ def exponentialMutationProb(iteration, maxIterations, prob_i = 0.15, prob_f = 0.
 	# returns an exponentialy decreasing mutation prob.
 	return prob_i*np.exp(1/maxIterations*np.log(prob_f/prob_i)*iteration )
 
+def explorationScoreBasedMutationProb(iteration, maxIterations, explorationScore, baseProb, maxProb): 
+	# Th values 
+	Th_start = 0.9
+	Th_end = 0.1
+	Th = ((Th_end - Th_start)/maxIterations)*iteration + Th_start
+
+	if explorationScore >=  Th: 
+		# we are still exploring enough for this iteration. we can continue with the base mutation probabality.
+		return baseProb
+	else: 
+		# exploration is lower than we want for this iteration, we should increase the mutation probability. 
+		mProb = ((baseProb -  maxProb)/Th)*explorationScore + maxProb
+		return mProb
+
 #######################################################################################
 ## functions for swap mutation 
-def linearNumbersToSwap(iteration, maxIterations, initial=40, final=1): 
+def linearNumbersToSwap(iteration, maxIterations, initial=100, final=10): 
 	"""
 		the number of elements to swap drops linearly during the iteration  
 		returns the numbers to swap determing on the iteration 
 	"""
 	return int( (final - initial)/(maxIterations)*iteration + initial)
 
-def exponentialNumbersToSwap(iteration, maxIterations, initial=40, final=1): 
+def exponentialNumbersToSwap(iteration, maxIterations, initial=10, final=1): 
 	"""
 		the number of elements to swap drops exponentialy during the iteration  
 	"""
@@ -316,10 +346,44 @@ def evaluateIteration(population):
 
 	return meanObjective, bestObjective, bestCycle
 
+def explorationScore(population):
+	""" 
+		A score reflecting how distinct the population is compared to the best candidate from the population. 
+		Compare every candidate to the best candidate, comparison is done element wise from the order 
+
+		explorationScore_ind(cand) = sum_{i}[ equal( best(i),cand(i) ) ] / [len(order)]
+		explorationScore = 1-avg_{cand}( explorationScore_ind(cand) )
+
+		where equal( best(i), cand(i) ) = 1 if best(i) == cand(i), else 0
+
+		explorationScore ~ 0 -> no exploration, all candidates equal. 
+		explorationScore ~ 1 -> lots of exploration. 
+	""" 
+
+	# population is order on length, best candidate is first element.
+	bestCycle = population[0].order
+	l = len(bestCycle)
+	explorationScore = 1-np.mean( np.array( list( np.sum(np.equal(bestCycle, candidate.order) )/l for  candidate in population ) ) ) 
+
+	return explorationScore
+
+
 
 def main(): 
 	# global DM # making it global otherwise it always has to be passed as an argument. 
-	# DM, nbrOfVertices = loadData('tour29.csv')
+	# DM, nbrOfVertices = loadData('tour929.csv')
+	# tour29: simple greedy heuristic 30350.13, optimal value approximately 27500
+	# tour194: simple greedy heuristic 11385.01, optimal value approximately 9000
+	# tour929: simple greedy heuristic 113683.58, optimal value approximately 95300
+
+	# look at distance matrix 
+	# x = np.arange(0,nbrOfVertices,1)
+	# plt.imshow(np.flip(DM, axis=1))
+	# # plt.xticks(x)
+	# # plt.yticks(x,np.flip(x))
+	# plt.colorbar()
+	# plt.show()
+
 	
 	# nbrOfPaths = 2
 	# k = 3 # k tournament parameter
@@ -383,7 +447,7 @@ def main():
 	# testing final iterator using the r012345 class 
 	 
 	test = r0123456()
-	test.optimize('data/tour194.csv')
+	test.optimize('data/tour929.csv')
 
 	# tour29: simple greedy heuristic 30350.13, optimal value approximately 27500
 	# tour194: simple greedy heuristic 11385.01, optimal value approximately 9000
