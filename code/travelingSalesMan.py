@@ -8,8 +8,6 @@ import Reporter
 
 	Representation: vector v with order of cities visited. 
 					length(v) = nbrOfVertices
-
-	
 """
 
 ## CLASSES
@@ -31,13 +29,17 @@ class r0123456:
 		nbrOfVertices = len(DM)
 
 		## variables. 
-		nbrOfPaths = 100
-		offSpringSize = 100
-		k = 10
-		maxIterions = 200
+		nbrOfPaths = 100 # pop size
+		offSpringSize = 100 
+		k = 5 # k tournament 
+		maxIterions = 300
+
+	# tour29: simple greedy heuristic 30350.13, optimal value approximately 27500
+	# tour194: simple greedy heuristic 11385.01, optimal value approximately 9000
+	# tour929: simple greedy heuristic 113683.58, optimal value approximately 95300
 
 
-		fraction = 1
+		#fraction = 0.8
 
 		explorationScores = np.zeros(maxIterions)
 		explorationBeforeMutation =  np.zeros(maxIterions)
@@ -54,18 +56,21 @@ class r0123456:
 			print(i)
 			# Your code here.
 			offSpring = np.zeros(offSpringSize, dtype=Path)
-			for jj in range(offSpringSize):
+			for jj in range(0,offSpringSize,2):
 				parent1 = selection_Ktournament(population, k)
 				parent2 = selection_Ktournament(population, k)
+
 				offSpring[jj] = recombination(parent1, parent2)
+				offSpring[jj+1] = recombination(parent2, parent1)
+
 			
 			# mutation only on population, not offspring? 
-			prob = mutation(population, i, maxIterions, mutationProb='lineair', elementsToSwap='inv', explorationScore = expScore)
+			prob = mutation(population, i, maxIterions, mutationProb='lineair', elementsToSwap='lineair', explorationScore = expScore)
 			mutationProb[i] = prob
 			explorationBeforeMutation[i] = explorationScore(population)
 
-			population = agedBasedElimination(population, offSpring, fraction)
-			#population = elimination(population, offSpring)
+			#population = agedBasedElimination(population, offSpring, fraction)
+			population = elimination(population, offSpring)
 			# Call the reporter with:
 			#  - the mean objective function value of the population
 			#  - the best objective function value of the population
@@ -80,8 +85,8 @@ class r0123456:
 			if timeLeft < 0:
 				break
 			i+=1 
-		# for (idx, path) in enumerate(population): 
-		# 	print( 'Path {},length: {}, order: {}'.format(idx,path.length,path.order) )
+		for (idx, path) in enumerate(population): 
+			print( 'Path {},length: {}, order: {}'.format(idx,path.length,path.order) )
 
 		plt.plot(np.arange(0,maxIterions), explorationScores, label = 'exploration')
 		plt.plot(np.arange(0,maxIterions), explorationBeforeMutation, label = 'exploration before mutation')
@@ -180,32 +185,37 @@ def recombination(parent1, parent2):
 	order cross over implementation. 
 	"""
 	# get orders of parents 
-	order1 = parent1.order
-	order2 = parent2.order 
 
-	# child order 
-	order_child = np.zeros(len(order1))
+	if np.random.uniform() < 0.9: 
+		order1 = parent1.order
+		order2 = parent2.order 
 
-	# select random sublist from parent1 defined by its start and end index, startIDX, endIDX
-	randomIDX1 = random.randint(0,len(order1)-1) # minus 1 since last element is included. 
-	randomIDX2 = random.randint(0,len(order1)-1)
-	startIDX = np.min([randomIDX1, randomIDX2])
-	endIDX = np.max([randomIDX1, randomIDX2])
+		# child order 
+		order_child = np.zeros(len(order1))
 
-	# copy part from parent1 to child 
-	verticesCovered = order1[startIDX:endIDX] # vertices covered cannot be selected from parent2
-	order_child[startIDX:endIDX] = verticesCovered
+		# select random sublist from parent1 defined by its start and end index, startIDX, endIDX
+		randomIDX1 = random.randint(0,len(order1)-1) # minus 1 since last element is included. 
+		randomIDX2 = random.randint(0,len(order1)-1)
+		startIDX = np.min([randomIDX1, randomIDX2])
+		endIDX = np.max([randomIDX1, randomIDX2])
 
-	# Indexes from the child that still have to be filled.
-	remainingIDX = np.setdiff1d(np.arange(0,len(order1)),np.arange(startIDX,endIDX))
-	remainingVertices = np.setdiff1d(order2, verticesCovered, True) # True parameter since we dont want a sorted list. 
-	
-	for (i,idx) in enumerate(remainingIDX): 
-		order_child[idx] = remainingVertices[i]
+		# copy part from parent1 to child 
+		verticesCovered = order1[startIDX:endIDX] # vertices covered cannot be selected from parent2
+		order_child[startIDX:endIDX] = verticesCovered
 
-	order_child = order_child.astype(int)
+		# Indexes from the child that still have to be filled.
+		remainingIDX = np.setdiff1d(np.arange(0,len(order1)),np.arange(startIDX,endIDX))
+		remainingVertices = np.setdiff1d(order2, verticesCovered, True) # True parameter since we dont want a sorted list. 
+		
+		for (i,idx) in enumerate(remainingIDX): 
+			order_child[idx] = remainingVertices[i]
 
-	child = Path(order_child)
+		order_child = order_child.astype(int)
+
+		child = Path(order_child)
+	else: 
+
+		child = np.random.choice([parent1, parent2])
 
 	return child 
 
@@ -348,7 +358,7 @@ def agedBasedElimination(population, offspring, fraction):
 
 	# convert to array of lengths and get indices that sort this array  
 	idx_pop = np.argsort(np.array(list( path.length for path in population )))[0:int(fraction*len(population))]
-	idx_off = np.argsort(np.array(list( path.length for path in offspring )))[0:len(population) - int(fraction*len(population))]
+	idx_off = np.argsort(np.array(list( path.length for path in offspring )))[0:int(len(population) - fraction*len(population))]
 
 	selectedFromPopulation = population[idx_pop]
 	selectedFromOffspring = offspring[idx_off]
@@ -358,7 +368,7 @@ def agedBasedElimination(population, offspring, fraction):
 	idx_sort = np.argsort(np.array(list( path.length for path in combined )))
 
 	sortedCombined = combined[idx_sort]
-
+	print(len(sortedCombined))
 
 	return sortedCombined
 
@@ -399,7 +409,9 @@ def explorationScore(population):
 	# population is order on length, best candidate is first element.
 	bestCycle = population[0].order
 	l = len(bestCycle)
-	explorationScore = 1-np.mean( np.array( list( np.sum(np.equal(bestCycle, candidate.order) )/l for  candidate in population ) ) ) 
+	#explorationScore = 1-np.mean( np.array( list( np.sum(np.equal(bestCycle, candidate.order) )/l for  candidate in population ) ) ) 
+
+	explorationScore = 1-np.min( np.array( list( np.sum(np.equal(population[i].order, population[i+1].order) )/l for  i in range(len(population) - 1 ) ) ) )  
 
 	return explorationScore
 
