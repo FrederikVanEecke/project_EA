@@ -34,10 +34,16 @@ class r0123456:
 		nbrOfPaths = 100
 		offSpringSize = 100
 		k = 10
-		maxIterions = 1000
+		maxIterions = 200
+
+
+		fraction = 1
+
 		explorationScores = np.zeros(maxIterions)
 		explorationBeforeMutation =  np.zeros(maxIterions)
 		mutationProb = np.zeros(maxIterions)
+		fitnesses = np.zeros(maxIterions)
+
 		# initialize 
 		population = initialization(nbrOfPaths, nbrOfVertices)
 
@@ -57,13 +63,16 @@ class r0123456:
 			prob = mutation(population, i, maxIterions, mutationProb='lineair', elementsToSwap='inv', explorationScore = expScore)
 			mutationProb[i] = prob
 			explorationBeforeMutation[i] = explorationScore(population)
-			population = elimination(population, offSpring)
+
+			population = agedBasedElimination(population, offSpring, fraction)
+			#population = elimination(population, offSpring)
 			# Call the reporter with:
 			#  - the mean objective function value of the population
 			#  - the best objective function value of the population
 			#  - a 1D numpy array in the cycle notation containing the best solution 
 			#    with city numbering starting from 0
 			meanObjective, bestObjective, bestSolution = evaluateIteration(population)
+			fitnesses[i] = meanObjective
 			expScore = explorationScore(population)
 			explorationScores[i] = expScore
 			print('Mean objective: {}, best objective: {}'.format(np.round(meanObjective,2), np.round(bestObjective,2) ))
@@ -77,6 +86,7 @@ class r0123456:
 		plt.plot(np.arange(0,maxIterions), explorationScores, label = 'exploration')
 		plt.plot(np.arange(0,maxIterions), explorationBeforeMutation, label = 'exploration before mutation')
 		plt.plot(np.arange(0,maxIterions), mutationProb, label = 'mutation probability')
+		plt.plot(np.arange(0,maxIterions), fitnesses/np.max(fitnesses), label = 'mean fitnesses')
 		plt.legend()
 		plt.show()
 		# Your code here.
@@ -134,7 +144,7 @@ def objectiveFunction(order):
 	# distance between last and first element
 	# + 
 	# distance between consecutive elements from the order. 
-	return  DM[order[-1], order[0]] + sum(DM[order[i], order[i+1]] for i in range(len(order)-1)) 
+	return  DM[order[-1], order[0]] + sum( DM[order[i], order[i+1]] for i in range(len(order)-1) ) 
 
 
 
@@ -262,7 +272,7 @@ def explorationScoreBasedMutationProb(iteration, maxIterations, explorationScore
 
 #######################################################################################
 ## functions for swap mutation 
-def linearNumbersToSwap(iteration, maxIterations, initial=100, final=10): 
+def linearNumbersToSwap(iteration, maxIterations, initial=10, final=1): 
 	"""
 		the number of elements to swap drops linearly during the iteration  
 		returns the numbers to swap determing on the iteration 
@@ -328,6 +338,32 @@ def elimination(population, offspring):
 
 	return combined[idx]
 
+
+def agedBasedElimination(population, offspring, fraction):
+	"""
+		Strategy is to combine the population and offspring and simply return the best paths. 
+	"""
+	# staking them together burher
+	#combined = np.hstack((population, offspring))
+
+	# convert to array of lengths and get indices that sort this array  
+	idx_pop = np.argsort(np.array(list( path.length for path in population )))[0:int(fraction*len(population))]
+	idx_off = np.argsort(np.array(list( path.length for path in offspring )))[0:len(population) - int(fraction*len(population))]
+
+	selectedFromPopulation = population[idx_pop]
+	selectedFromOffspring = offspring[idx_off]
+
+	combined = np.hstack([selectedFromPopulation, selectedFromOffspring])
+
+	idx_sort = np.argsort(np.array(list( path.length for path in combined )))
+
+	sortedCombined = combined[idx_sort]
+
+
+	return sortedCombined
+
+
+
 ## function to evaluate an iterion
 def evaluateIteration(population): 
 	"""
@@ -370,8 +406,9 @@ def explorationScore(population):
 
 
 def main(): 
-	# global DM # making it global otherwise it always has to be passed as an argument. 
-	# DM, nbrOfVertices = loadData('tour929.csv')
+	global DM # making it global otherwise it always has to be passed as an argument. 
+
+	DM, nbrOfVertices = loadData('tour29.csv')
 	# tour29: simple greedy heuristic 30350.13, optimal value approximately 27500
 	# tour194: simple greedy heuristic 11385.01, optimal value approximately 9000
 	# tour929: simple greedy heuristic 113683.58, optimal value approximately 95300
@@ -423,10 +460,18 @@ def main():
 	# print(path.length)
 	# # seems to work 
 
+	path = Path(np.random.permutation(29))
+
+	# order = np.arange(0,29,1)
+	# path.set_order(order)
+	# print(path.length)
+
+
+
 
 	# ## testing mutation related functions 
-	iterations = np.arange(0,101,1)
-	maxIterations = 100 
+	# iterations = np.arange(0,101,1)
+	# maxIterations = 100 
 	# # testing mutation probability 
 	# plt.plot(iterations, linearMutationProb(iterations, maxIterations), label='lineair')
 	# plt.plot(iterations, exponentialMutationProb(iterations, maxIterations), label='exponetial')
@@ -445,9 +490,10 @@ def main():
 	# 		print( 'Path {},length: {}, order: {}'.format(idx,path.length,path.order) )
 
 	# testing final iterator using the r012345 class 
-	 
+	
+
 	test = r0123456()
-	test.optimize('data/tour929.csv')
+	test.optimize('data/tour29.csv')
 
 	# tour29: simple greedy heuristic 30350.13, optimal value approximately 27500
 	# tour194: simple greedy heuristic 11385.01, optimal value approximately 9000
@@ -457,6 +503,7 @@ def main():
 	# # best objective: 27159.84 
 	# # cycle: [ 9  5  0  1  4  7  3  2  6  8 12 13 16 19 15 23 26 24 25 27 28 20 22 21 17 18 14 11 10]
 	# # pars: k=10, mutation prob: 0.15 to 0.5, numbers to swap: 10 to 1, both linear
+
 
 if __name__ == '__main__':
 	main()
