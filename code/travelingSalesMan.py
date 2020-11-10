@@ -85,8 +85,8 @@ class r0123456:
 			if timeLeft < 0:
 				break
 			i+=1 
-		for (idx, path) in enumerate(population): 
-			print( 'Path {},length: {}, order: {}'.format(idx,path.length,path.order) )
+		# for (idx, path) in enumerate(population): 
+		# 	print( 'Path {},length: {}, order: {}'.format(idx,path.length,path.order) )
 
 		plt.plot(np.arange(0,maxIterions), explorationScores, label = 'exploration')
 		plt.plot(np.arange(0,maxIterions), explorationBeforeMutation, label = 'exploration before mutation')
