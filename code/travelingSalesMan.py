@@ -47,7 +47,11 @@ class r0123456:
 		fitnesses = np.zeros(maxIterions)
 
 		# initialize 
-		population = initialization(nbrOfPaths, nbrOfVertices)
+		#population = initialization(nbrOfPaths, nbrOfVertices)
+		population = sparseInit(nbrOfPaths, nbrOfVertices, DM)
+
+		for path in population: 
+			print(path.order)
 
 		# Your code here.
 		i=0
@@ -116,7 +120,6 @@ class Path:
 		# setting the length depending on the order of the path
 		self.length = objectiveFunction(self.order)
 
-
 	## IMPORTANT: A PATH DIRECTLY UPDATED THE LENGTH IF ITS ORDER IS CHANGED!	
 	def set_order(self, newOrder):
 		self.order = newOrder # setting new order. 
@@ -149,7 +152,8 @@ def objectiveFunction(order):
 	# distance between last and first element
 	# + 
 	# distance between consecutive elements from the order. 
-	return  DM[order[-1], order[0]] + sum( DM[order[i], order[i+1]] for i in range(len(order)-1) ) 
+	x = DM[order[-1], order[0]] + sum( DM[order[i], order[i+1]] for i in range(len(order)-1) )  
+	return x
 
 
 
@@ -162,7 +166,57 @@ def initialization(nbrOfPaths, nbrOfVertices):
 		returns: array with nbrOfPaths Path objects. 
 	"""
 
-	return np.array( list( Path(np.random.permutation(nbrOfVertices)) for i in range(nbrOfPaths) ) )
+	population = np.zeros(nbrOfPaths, dtype=Path)
+
+	validOnes = 0
+	run = 0
+	while validOnes < nbrOfPaths: 
+		#print(run)
+		print(validOnes)
+		run+=1
+		newPath = Path(np.random.permutation(nbrOfVertices))
+		if not np.isinf(newPath.length): 
+			population[validOnes] = newPath
+			validOnes+=1 
+
+
+	return population
+	#return np.array( list( Path(np.random.permutation(nbrOfVertices)) for i in range(nbrOfPaths) ) )
+
+
+def sparseInit(nbrOfPaths, nbrOfVertices, DM):
+	population = np.zeros(nbrOfPaths, dtype = Path)
+
+	nonValid = 0
+
+	j=0
+	while j < nbrOfPaths:
+		succes=True
+		order =  np.zeros(nbrOfVertices)
+		startCity = random.randint(0,nbrOfVertices)
+		order[0]=startCity
+		visited = list()
+		print(len(order))
+		for i in range(1,len(order)-1):
+			print(order[i])
+			possibleConnections = np.where(np.invert(np.isinf(DM[int(order[i-1]),:])))
+			try:
+				selectOne = np.random.choice(np.setdiff1d( possibleConnections, np.array(visited) ))
+			except:
+				succes=False
+				nonValid+=1 
+				print('break: {}'.format(nonValid))
+				break 
+			print(selectOne)
+			order[i] = selectOne
+			visited.append(selectOne)
+		order = order.astype(int)
+		print(order)
+		if succes:
+			population[j] = Path(np.array(order))
+			j+=1
+
+	return population
 
 
 def selection_Ktournament(population:np.ndarray, k): 
@@ -505,7 +559,9 @@ def main():
 	
 
 	test = r0123456()
-	test.optimize('data/tour29.csv')
+	test.optimize('data/tour100.csv')
+
+
 
 	# tour29: simple greedy heuristic 30350.13, optimal value approximately 27500
 	# tour194: simple greedy heuristic 11385.01, optimal value approximately 9000
